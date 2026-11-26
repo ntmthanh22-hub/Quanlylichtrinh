@@ -104,17 +104,17 @@ def dinh_ly_phan_du_trung_hoa(a, m):
     M = 1
     for m_i in m:
         M *= m_i
-     
+
     x = 0
     for a_i, m_i in zip(a, m):
         M_i = M // m_i
         gcd, e_i, _ = thuc_hien_euclid_mo_rong(M_i, m_i)
-         
+
         if gcd != 1:
             raise ValueError(f"Các chu kỳ không nguyên tố cùng nhau tại m_i = {m_i}")
-         
+
         x += a_i * M_i * e_i
-         
+
     return x % M, M
 
 
@@ -128,18 +128,18 @@ if 'activities' not in st.session_state:
 
 with st.sidebar:
     st.header("⚙️ Thiết lập lịch trình & Hoạt động")
-    
+
     global_start_date = st.date_input("📅 Ngày bắt đầu mô phỏng chung", datetime.date.today())
-     
+
     st.markdown("---")
     st.markdown("Quản lý danh sách hoạt động:")
-     
+
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
         if st.button("➕ Thêm"):
             st.session_state.activities.append({
-                "name": "Hoạt động mới", 
-                "cycle": 7, 
+                "name": "Hoạt động mới",
+                "cycle": 7,
                 "start_date": datetime.date.today()
             })
             save_activities_db(st.session_state.activities)
@@ -149,19 +149,19 @@ with st.sidebar:
             st.session_state.activities.pop()
             save_activities_db(st.session_state.activities)
             st.rerun()
-          
+
     st.markdown("---")
-     
+
     updated_activities = []
     for i, act in enumerate(st.session_state.activities):
         st.markdown(f"**Hoạt động {i+1}**")
         name = st.text_input("Tên hoạt động", value=act["name"], key=f"name_act_{i}")
         cycle = st.number_input("Chu kỳ (ngày)", min_value=1, max_value=60, value=int(act["cycle"]), key=f"cycle_act_{i}")
         start_d = st.date_input("Ngày bắt đầu riêng", value=act["start_date"], key=f"date_act_{i}")
-        
+
         updated_activities.append({"name": name, "cycle": cycle, "start_date": start_d})
         st.markdown("---")
-     
+
     if updated_activities != st.session_state.activities:
         st.session_state.activities = updated_activities
         save_activities_db(st.session_state.activities)
@@ -188,31 +188,31 @@ for i in range(total_days):
     current_day_index = i + 1
     actual_date = global_start_date + datetime.timedelta(days=i)
     date_str = actual_date.strftime("%d/%m/%Y")
-     
+
     row = {
         "Ngày thứ": current_day_index,
         "Ngày cụ thể": date_str
     }
-     
+
     active_count = 0
     for act in st.session_state.activities:
         name = act["name"]
         cycle = act["cycle"]
         act_start = act["start_date"]
-        
+
         if cycle <= 0:
             cycle = 1
-            
+
         if actual_date >= act_start:
             delta_days = (actual_date - act_start).days
             is_due = (delta_days % cycle == 0)
         else:
             is_due = False
-            
+
         row[name] = "✔️ Thực hiện" if is_due else "-"
         if is_due:
             active_count += 1
-            
+
     row[COUNT_COL] = active_count
     schedule_data.append(row)
 
@@ -259,6 +259,35 @@ st.bar_chart(df.set_index("Ngày cụ thể")[COUNT_COL])
 st.markdown("---")
 st.subheader("📥 Xuất Hình Ảnh Bảng Lịch Trình")
 
+def load_vietnamese_fonts():
+    font_pairs = [
+        ("Roboto-Regular.ttf", "Roboto-Bold.ttf"),
+        ("NotoSans-Regular.ttf", "NotoSans-Bold.ttf"),
+    ]
+    for reg_font, bold_font in font_pairs:
+        if os.path.exists(reg_font):
+            f_reg = ImageFont.truetype(reg_font, 18)
+            f_bold = ImageFont.truetype(bold_font if os.path.exists(bold_font) else reg_font, 18)
+            f_title = ImageFont.truetype(bold_font if os.path.exists(bold_font) else reg_font, 22)
+            return f_reg, f_bold, f_title
+
+    try:
+        if os.name == "nt":
+            return (
+                ImageFont.truetype("arial.ttf", 18),
+                ImageFont.truetype("arialbd.ttf", 18),
+                ImageFont.truetype("arialbd.ttf", 22),
+            )
+        return (
+            ImageFont.truetype("DejaVuSans.ttf", 18),
+            ImageFont.truetype("DejaVuSans-Bold.ttf", 18),
+            ImageFont.truetype("DejaVuSans-Bold.ttf", 22),
+        )
+    except Exception:
+        default_f = ImageFont.load_default()
+        return default_f, default_f, default_f
+
+
 def tao_anh_tu_dataframe_phan(dataframe, tieu_de_phan):
     df_export = dataframe.copy()
     for col in df_export.columns:
@@ -267,64 +296,56 @@ def tao_anh_tu_dataframe_phan(dataframe, tieu_de_phan):
 
     row_height = 45
     header_height = 60
-    img_width = 1200
+    img_width = 1400
     img_height = header_height + (len(df_export) + 1) * row_height + 40
-     
+
     image = Image.new("RGB", (img_width, img_height), color=(255, 255, 255))
     draw = ImageDraw.Draw(image)
-     
-    try:
-        if os.name == 'nt':
-            font = ImageFont.truetype("arial.ttf", 18)
-            font_bold = ImageFont.truetype("arialbd.ttf", 18)
-            font_title = ImageFont.truetype("arialbd.ttf", 22)
-        else:
-            font = ImageFont.truetype("DejaVuSans.ttf", 18)
-            font_bold = ImageFont.truetype("DejaVuSans-Bold.ttf", 18)
-            font_title = ImageFont.truetype("DejaVuSans-Bold.ttf", 22)
-    except:
-        font = ImageFont.load_default()
-        font_bold = font
-        font_title = font
 
-    draw.text((20, 20), f"BANG LICH TRINH SUC KHOE - {tieu_de_phan}", fill=(24, 119, 242), font=font_title)
-     
+    font, font_bold, font_title = load_vietnamese_fonts()
+
+    draw.text((20, 20), f"BẢNG LỊCH TRÌNH SỨC KHỎE - {tieu_de_phan}", fill=(24, 119, 242), font=font_title)
+
     columns = list(df_export.columns)
     x_start = 20
     y_start = 65
     col_width = (img_width - 40) / len(columns)
-     
+
     for col_idx, col_name in enumerate(columns):
         draw.rectangle([x_start + col_idx * col_width, y_start, x_start + (col_idx + 1) * col_width, y_start + 40], fill=(240, 242, 246), outline=(200, 200, 200))
         draw.text((x_start + col_idx * col_width + 10, y_start + 10), str(col_name), fill=(0, 0, 0), font=font_bold)
-         
+
     curr_y = y_start + 40
-    for row_idx, row in df_export.iterrows():
+    for _, row in df_export.iterrows():
         bg_color = (255, 230, 230) if row.get(COUNT_COL, 0) >= 2 else (255, 255, 255)
         for col_idx, col_name in enumerate(columns):
             draw.rectangle([x_start + col_idx * col_width, curr_y, x_start + (col_idx + 1) * col_width, curr_y + row_height], fill=bg_color, outline=(220, 220, 220))
             val = str(row[col_name])
             draw.text((x_start + col_idx * col_width + 10, curr_y + 12), val, fill=(50, 50, 50), font=font)
         curr_y += row_height
-         
+
     buf = io.BytesIO()
     image.save(buf, format="PNG")
     buf.seek(0)
     return buf
 
+show_preview_mobile = st.toggle("📱 Bật chế độ xem trước ảnh trực tiếp trên điện thoại", value=False)
+
 if total_days <= 30:
     st.markdown("Lịch trình ngắn (<= 30 ngày), hệ thống xuất thành **1 ảnh duy nhất** với cỡ chữ lớn, rõ ràng:")
-    img_bytes = tao_anh_tu_dataframe_phan(df, "TOAN BO LICH TRINH")
+    img_bytes = tao_anh_tu_dataframe_phan(df, "TOÀN BỘ LỊCH TRÌNH")
     st.download_button(
         label="🖼️ Tải xuống Bảng Lịch Trình (.png)",
         data=img_bytes,
         file_name="bang_lich_trinh_chi_tiet.png",
-        mime="image/png",
+        mime="application/octet-stream",
         help="Tải ảnh toàn bộ lịch trình với cỡ chữ lớn, dễ nhìn."
     )
+    if show_preview_mobile:
+        st.image(img_bytes, caption="TOÀN BỘ LỊCH TRÌNH", use_container_width=True)
 else:
     st.markdown(f"Lịch trình dài ({total_days} ngày > 30 ngày), hệ thống đã tự động chia thành **2 phần riêng biệt**:")
-     
+
     mid_index = len(df) // 2
     df_part1 = df.iloc[:mid_index]
     df_part2 = df.iloc[mid_index:]
@@ -332,24 +353,28 @@ else:
     col_img1, col_img2 = st.columns(2)
 
     with col_img1:
-        img_bytes_1 = tao_anh_tu_dataframe_phan(df_part1, "PHAN 1 (Nua dau)")
+        img_bytes_1 = tao_anh_tu_dataframe_phan(df_part1, "PHẦN 1 (Nửa đầu)")
         st.download_button(
             label="🖼️ Tải ảnh Phần 1 (Nửa đầu)",
             data=img_bytes_1,
             file_name="lich_trinh_phan_1.png",
-            mime="image/png",
+            mime="application/octet-stream",
             help="Tải ảnh nửa đầu lịch trình."
         )
+        if show_preview_mobile:
+            st.image(img_bytes_1, caption="PHẦN 1 (Nửa đầu)", use_container_width=True)
 
     with col_img2:
-        img_bytes_2 = tao_anh_tu_dataframe_phan(df_part2, "PHAN 2 (Nua sau)")
+        img_bytes_2 = tao_anh_tu_dataframe_phan(df_part2, "PHẦN 2 (Nửa sau)")
         st.download_button(
             label="🖼️ Tải ảnh Phần 2 (Nửa sau)",
             data=img_bytes_2,
             file_name="lich_trinh_phan_2.png",
-            mime="image/png",
+            mime="application/octet-stream",
             help="Tải ảnh nửa sau lịch trình."
         )
+        if show_preview_mobile:
+            st.image(img_bytes_2, caption="PHẦN 2 (Nửa sau)", use_container_width=True)
 
 # =====================================================================
 # PHẦN 4: THỐNG KÊ SỐ LƯỢNG TRUY CẬP
