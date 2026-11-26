@@ -259,62 +259,127 @@ st.bar_chart(df.set_index("Ngày cụ thể")[COUNT_COL])
 st.markdown("---")
 st.subheader("📥 Xuất Hình Ảnh Bảng Lịch Trình")
 
+
+def tim_font_tieng_viet():
+    base_dir = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else os.getcwd()
+    candidates = [
+        os.path.join(base_dir, "DejaVuSans.ttf"),
+        os.path.join(base_dir, "Roboto-Regular.ttf"),
+        os.path.join(base_dir, "Arial.ttf"),
+        "C:\\Windows\\Fonts\\arial.ttf",
+        "C:\\Windows\\Fonts\\tahoma.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return None
+
+
 def tao_anh_tu_dataframe_phan(dataframe, tieu_de_phan):
     df_export = dataframe.copy()
     for col in df_export.columns:
         if col not in ["Ngày thứ", "Ngày cụ thể", COUNT_COL]:
             df_export[col] = df_export[col].astype(str).str.replace("✔️ Thực hiện", "[Thực hiện]")
 
+    font_path = tim_font_tieng_viet()
+
+    def load_font(size):
+        if font_path:
+            try:
+                return ImageFont.truetype(font_path, size)
+            except Exception:
+                pass
+        return ImageFont.load_default()
+
+    font = load_font(18)
+    font_bold = load_font(18)
+    font_title = load_font(22)
+
+    dummy_img = Image.new("RGB", (10, 10))
+    dummy_draw = ImageDraw.Draw(dummy_img)
+
+    def do_rong_chu(text, fnt):
+        bbox = dummy_draw.textbbox((0, 0), str(text), font=fnt)
+        return bbox[2] - bbox[0]
+
+    columns = list(df_export.columns)
+    padding_x = 24
+    col_widths = []
+    for col_name in columns:
+        max_w = do_rong_chu(col_name, font_bold) + padding_x * 2
+        for val in df_export[col_name]:
+            w = do_rong_chu(val, font) + padding_x * 2
+            if w > max_w:
+                max_w = w
+        col_widths.append(max(max_w, 130))
+
     row_height = 45
-    header_height = 60
-    img_width = 1200
-    img_height = header_height + (len(df_export) + 1) * row_height + 40
-     
+    header_height = 40
+    top_margin = 65
+    side_margin = 20
+    img_width = int(sum(col_widths) + side_margin * 2)
+    img_height = int(top_margin + header_height + len(df_export) * row_height + 40)
+
     image = Image.new("RGB", (img_width, img_height), color=(255, 255, 255))
     draw = ImageDraw.Draw(image)
-     
-    try:
-        if os.name == 'nt':
-            font = ImageFont.truetype("arial.ttf", 18)
-            font_bold = ImageFont.truetype("arialbd.ttf", 18)
-            font_title = ImageFont.truetype("arialbd.ttf", 22)
-        else:
-            font = ImageFont.truetype("DejaVuSans.ttf", 18)
-            font_bold = ImageFont.truetype("DejaVuSans-Bold.ttf", 18)
-            font_title = ImageFont.truetype("DejaVuSans-Bold.ttf", 22)
-    except:
-        font = ImageFont.load_default()
-        font_bold = font
-        font_title = font
 
-    draw.text((20, 20), f"BANG LICH TRINH SUC KHOE - {tieu_de_phan}", fill=(24, 119, 242), font=font_title)
-     
-    columns = list(df_export.columns)
-    x_start = 20
-    y_start = 65
-    col_width = (img_width - 40) / len(columns)
-     
+    draw.text(
+        (side_margin, 20),
+        f"BẢNG LỊCH TRÌNH SỨC KHỎE - {tieu_de_phan}",
+        fill=(24, 119, 242),
+        font=font_title,
+    )
+
+    x_curr = side_margin
+    y_header = top_margin
     for col_idx, col_name in enumerate(columns):
-        draw.rectangle([x_start + col_idx * col_width, y_start, x_start + (col_idx + 1) * col_width, y_start + 40], fill=(240, 242, 246), outline=(200, 200, 200))
-        draw.text((x_start + col_idx * col_width + 10, y_start + 10), str(col_name), fill=(0, 0, 0), font=font_bold)
-         
-    curr_y = y_start + 40
-    for row_idx, row in df_export.iterrows():
+        w = col_widths[col_idx]
+        draw.rectangle(
+            [x_curr, y_header, x_curr + w, y_header + header_height],
+            fill=(240, 242, 246),
+            outline=(200, 200, 200),
+        )
+        draw.text(
+            (x_curr + 10, y_header + 10),
+            str(col_name),
+            fill=(0, 0, 0),
+            font=font_bold,
+        )
+        x_curr += w
+
+    curr_y = y_header + header_height
+    for _, row in df_export.iterrows():
         bg_color = (255, 230, 230) if row.get(COUNT_COL, 0) >= 2 else (255, 255, 255)
+        x_curr = side_margin
         for col_idx, col_name in enumerate(columns):
-            draw.rectangle([x_start + col_idx * col_width, curr_y, x_start + (col_idx + 1) * col_width, curr_y + row_height], fill=bg_color, outline=(220, 220, 220))
+            w = col_widths[col_idx]
+            draw.rectangle(
+                [x_curr, curr_y, x_curr + w, curr_y + row_height],
+                fill=bg_color,
+                outline=(220, 220, 220),
+            )
             val = str(row[col_name])
-            draw.text((x_start + col_idx * col_width + 10, curr_y + 12), val, fill=(50, 50, 50), font=font)
+            draw.text(
+                (x_curr + 10, curr_y + 12),
+                val,
+                fill=(50, 50, 50),
+                font=font,
+            )
+            x_curr += w
         curr_y += row_height
-         
+
     buf = io.BytesIO()
     image.save(buf, format="PNG")
     buf.seek(0)
     return buf
 
+
+st.caption("💡 Trên điện thoại: bạn có thể bấm nút tải về, hoặc **nhấn giữ trực tiếp vào ảnh hiển thị bên dưới** để lưu nhanh vào Album ảnh.")
+
 if total_days <= 30:
     st.markdown("Lịch trình ngắn (<= 30 ngày), hệ thống xuất thành **1 ảnh duy nhất** với cỡ chữ lớn, rõ ràng:")
-    img_bytes = tao_anh_tu_dataframe_phan(df, "TOAN BO LICH TRINH")
+    img_bytes = tao_anh_tu_dataframe_phan(df, "TOÀN BỘ LỊCH TRÌNH")
     st.download_button(
         label="🖼️ Tải xuống Bảng Lịch Trình (.png)",
         data=img_bytes,
@@ -322,6 +387,7 @@ if total_days <= 30:
         mime="image/png",
         help="Tải ảnh toàn bộ lịch trình với cỡ chữ lớn, dễ nhìn."
     )
+    st.image(img_bytes, caption="Bảng lịch trình chi tiết", use_container_width=True)
 else:
     st.markdown(f"Lịch trình dài ({total_days} ngày > 30 ngày), hệ thống đã tự động chia thành **2 phần riêng biệt**:")
      
@@ -332,7 +398,7 @@ else:
     col_img1, col_img2 = st.columns(2)
 
     with col_img1:
-        img_bytes_1 = tao_anh_tu_dataframe_phan(df_part1, "PHAN 1 (Nua dau)")
+        img_bytes_1 = tao_anh_tu_dataframe_phan(df_part1, "PHẦN 1 (NỬA ĐẦU)")
         st.download_button(
             label="🖼️ Tải ảnh Phần 1 (Nửa đầu)",
             data=img_bytes_1,
@@ -340,9 +406,10 @@ else:
             mime="image/png",
             help="Tải ảnh nửa đầu lịch trình."
         )
+        st.image(img_bytes_1, caption="Phần 1 (Nửa đầu)", use_container_width=True)
 
     with col_img2:
-        img_bytes_2 = tao_anh_tu_dataframe_phan(df_part2, "PHAN 2 (Nua sau)")
+        img_bytes_2 = tao_anh_tu_dataframe_phan(df_part2, "PHẦN 2 (NỬA SAU)")
         st.download_button(
             label="🖼️ Tải ảnh Phần 2 (Nửa sau)",
             data=img_bytes_2,
@@ -350,6 +417,7 @@ else:
             mime="image/png",
             help="Tải ảnh nửa sau lịch trình."
         )
+        st.image(img_bytes_2, caption="Phần 2 (Nửa sau)", use_container_width=True)
 
 # =====================================================================
 # PHẦN 4: THỐNG KÊ SỐ LƯỢNG TRUY CẬP
